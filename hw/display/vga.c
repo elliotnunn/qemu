@@ -36,6 +36,8 @@
 #include "migration/vmstate.h"
 #include "trace.h"
 
+void curse(uint8_t *, int8_t, int8_t);
+
 //#define DEBUG_VGA_MEM
 //#define DEBUG_VGA_REG
 
@@ -740,6 +742,9 @@ void vbe_ioport_write_index(void *opaque, uint32_t addr, uint32_t val)
     s->vbe_index = val;
 }
 
+int cursorCounter;
+uint8_t cursor[4*16*16];
+
 void vbe_ioport_write_data(void *opaque, uint32_t addr, uint32_t val)
 {
     VGACommonState *s = opaque;
@@ -774,6 +779,7 @@ void vbe_ioport_write_data(void *opaque, uint32_t addr, uint32_t val)
             vga_update_memory_access(s);
             break;
         case VBE_DISPI_INDEX_ENABLE:
+            printf("VBE_DISPI_INDEX_ENABLE %x\n", val);
             if ((val & VBE_DISPI_ENABLED) &&
                 !(s->vbe_regs[VBE_DISPI_INDEX_ENABLE] & VBE_DISPI_ENABLED)) {
 
@@ -796,6 +802,21 @@ void vbe_ioport_write_data(void *opaque, uint32_t addr, uint32_t val)
             s->vbe_regs[s->vbe_index] = val;
             vga_update_memory_access(s);
             break;
+
+        case VBE_DISPI_INDEX_CURSOR_IMG:
+            cursor[cursorCounter++] = val >> 8;
+            cursor[cursorCounter++] = val;
+            cursorCounter &= sizeof(cursor) - 1;
+            break;
+
+        case VBE_DISPI_INDEX_CURSOR_HOTSPOT:
+            if (val == 0x8080) {
+                curse(NULL, 0, 0);
+            } else {
+                curse(cursor, (int8_t)(val >> 8), (int8_t)val);
+            }
+            break;
+
         default:
             break;
         }

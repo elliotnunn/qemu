@@ -354,7 +354,55 @@ static CGEventRef handleTapEvent(CGEventTapProxy proxy, CGEventType type, CGEven
     return cgEvent;
 }
 
+NSCursor *nscursor;
+
+uint8_t cursorCopy[4*16*16];
+
+// This is going to need a hotspot calculation
+void curse(uint8_t *cursor, int8_t hotX, int8_t hotY) {
+    if (cursor) memcpy(cursorCopy, cursor, sizeof(cursorCopy));
+
+    dispatch_async(dispatch_get_main_queue(), ^{
+        NSImage *img = [NSImage
+            imageWithSize:NSMakeSize(16, 16)
+            flipped:YES
+            drawingHandler:^BOOL(NSRect dest) {
+                [[NSColor clearColor] set];
+                NSRectFill(dest);
+
+                if (cursor == NULL) return YES;
+
+                for (int row = 0; row < 16; row++) {
+                    for (int col = 0; col < 16; col++) {
+                        int offset = (row*16 + col) * 4;
+
+                        [[NSColor
+                            colorWithRed: (CGFloat)cursorCopy[offset + 0] / 255.0
+                            green: (CGFloat)cursorCopy[offset + 1] / 255.0
+                            blue: (CGFloat)cursorCopy[offset + 2] / 255.0
+                            alpha: (CGFloat)cursorCopy[offset + 3] / 255.0
+                        ] set];
+
+                        NSRectFill(NSMakeRect(NSMinX(dest)+col, NSMinY(dest)+row, 1, 1));
+                    }
+                }
+
+                return YES;
+            }
+        ];
+
+        nscursor = [[NSCursor alloc] initWithImage:img hotSpot: NSMakePoint(hotX, hotY)];
+        [normalWindow resetCursorRects];
+    });
+}
+
 @implementation QemuCocoaView
+- (void)resetCursorRects
+{
+    [super resetCursorRects];
+    [self addCursorRect:[self bounds] cursor:nscursor];
+}
+
 - (id)initWithFrame:(NSRect)frameRect
 {
     COCOA_DEBUG("QemuCocoaView: initWithFrame\n");
